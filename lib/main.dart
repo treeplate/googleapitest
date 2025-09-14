@@ -97,9 +97,7 @@ class _MainAppState extends State<MainApp> {
                     OutlinedButton(onPressed: refresh, child: Text('Refresh')),
                     ...spaces!.map(
                       (e) => TextButton(
-                        child: Text(
-                          e.displayName ?? 'unnamed',
-                        ),
+                        child: Text(e.displayName ?? 'unnamed'),
                         onPressed: () {
                           setState(() {
                             selectedSpace = e;
@@ -110,6 +108,7 @@ class _MainAppState extends State<MainApp> {
                           ) {
                             setState(() {
                               messages = e.messages;
+                              messages ??= [];
                             });
                           });
                         },
@@ -140,18 +139,22 @@ class _MainAppState extends State<MainApp> {
                             child: SingleChildScrollView(
                               child: Column(
                                 children: [
-                                  ...messages!.map((e) => Card(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SelectableText(e.sender!.displayName ?? e.sender!.name!),
-                                          SelectableText(e.text!),
-                                        ],
+                                  ...messages!.map(
+                                    (e) => Card(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Wrap(
+                                          children: [
+                                            SelectableText(
+                                              e.sender!.displayName ??
+                                                  e.sender!.name!,
+                                            ),
+                                            SelectableText(e.text!),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  )),
+                                  ),
                                 ],
                               ),
                             ),
@@ -174,10 +177,12 @@ class _MainAppState extends State<MainApp> {
                           ),
                           IconButton(
                             onPressed: () {
-                              api!.spaces.messages.create(
-                                Message(text: textEditingController.text),
-                                selectedSpace!.name!,
-                              ).then((_) => refresh());
+                              api!.spaces.messages
+                                  .create(
+                                    Message(text: textEditingController.text),
+                                    selectedSpace!.name!,
+                                  )
+                                  .then((_) => refresh());
                             },
                             icon: Icon(Icons.send),
                           ),
