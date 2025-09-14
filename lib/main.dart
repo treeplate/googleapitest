@@ -33,7 +33,7 @@ class _MainAppState extends State<MainApp> {
     _googleSignIn
         .initialize(
           clientId:
-              "529808968087-mku5d0qk03l3mv8msq9ap3qb2jk1vs97.apps.googleusercontent.com",
+              "692759468698-k265dgnn15r8buae2lb615amhps0mock.apps.googleusercontent.com",
         )
         .then((_) {
           _googleSignIn.authenticationEvents.listen((event) {
