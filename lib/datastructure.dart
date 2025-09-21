@@ -1,11 +1,11 @@
-class Channel {
+class Space {
   // == spaces ==
   // "name"
   final String identifier;
-  final SpaceType spaceType;
+  final SpaceType type;
   // "singleUserBotDm" - default to false if that's null
   final bool botDM;
-  // null for unnamed
+  // null for anything other than SpaceType.space
   final String? displayName;
   // TODO: find out when this isn't null
   final bool? externalUserAllowed;
@@ -21,28 +21,48 @@ class Channel {
   final bool importMode;
   // null for DMs
   final DateTime? createTime;
-  final DateTime lastActiveTime;
-  final bool adminInstalled;
+  final DateTime? lastActiveTime;
+  // null for non-DMs
+  final bool? adminInstalled;
   // "membershipCount.joinedDirectHumanUserCount"
-  final int directlyJoinedHumans;
-  // "membershipCount.joinedGroupCount"
-  final int joinedGroups;
-  // "accessSettings.accessState" - null for unnamed
-  final AccessState? accessState;
+  final int joinedHumanCount;
+  // "membershipCount.joinedGroupCount" - defaults to zero if null
+  final int joinedGroupCount;
+  // "accessSettings.accessState" - null for anything other than SpaceType.space
+  final bool? discoverable;
   // "accessSettings.audience" - null means no target audience
   final String? targetAudienceIdentifier;
   final String spaceURI;
   // null if not in import mode
   final DateTime? importModeExpireTime;
-  // "customer" - null if not created by app authenticated program
-  final String? customerIdentifier;
-
   // == spaces.members ==
   final List<SpaceMember> members;
   // == spaces.messages ==
   final List<Message> messages;
 
-  Channel({required this.identifier, required this.spaceType, required this.botDM, required this.displayName, required this.externalUserAllowed, required this.threadingState, required this.description, required this.guidelines, required this.historyOn, required this.importMode, required this.createTime, required this.lastActiveTime, required this.adminInstalled, required this.directlyJoinedHumans, required this.joinedGroups, required this.accessState, required this.targetAudienceIdentifier, required this.spaceURI, required this.importModeExpireTime, required this.customerIdentifier, required this.members, required this.messages});
+  Space({
+    required this.identifier,
+    required this.type,
+    required this.botDM,
+    required this.displayName,
+    required this.externalUserAllowed,
+    required this.threadingState,
+    required this.description,
+    required this.guidelines,
+    required this.historyOn,
+    required this.importMode,
+    required this.createTime,
+    required this.lastActiveTime,
+    required this.adminInstalled,
+    required this.joinedHumanCount,
+    required this.joinedGroupCount,
+    required this.discoverable,
+    required this.targetAudienceIdentifier,
+    required this.spaceURI,
+    required this.importModeExpireTime,
+    required this.members,
+    required this.messages,
+  });
 }
 
 class SpaceMember {
@@ -88,10 +108,11 @@ class Message {
   final String? fallbackText;
   // "attachment" - null if no attachments
   final Attachment? attachment;
+  // defaults to false if null
   final bool threadReply;
   // null if not set by this app
   final String? clientAssignedMessageId;
-  // "emojiReactionSummaries"
+  // "emojiReactionSummaries" - defaults to empty if null
   final Map<String, int> emojis;
   // "privateMessageViewer.name" - null if not private message
   final String? privateMessageViewerIdentifier;
@@ -105,7 +126,29 @@ class Message {
   final DateTime? quotedMessageLastUpdateTime;
   final List<String> attachedGifs;
 
-  Message({required this.identifier, required this.senderIdentifier, required this.senderIsBot, required this.createTime, required this.lastUpdateTime, required this.deleteTime, required this.formattedText, required this.threadIdentifier, required this.threadKey, required this.spaceIdentifier, required this.fallbackText, required this.attachment, required this.threadReply, required this.clientAssignedMessageId, required this.emojis, required this.privateMessageViewerIdentifier, required this.privateMessageViewerIsBot, required this.deletionType, required this.quotedMessageIdentifier, required this.quotedMessageLastUpdateTime, required this.attachedGifs});
+  Message({
+    required this.identifier,
+    required this.senderIdentifier,
+    required this.senderIsBot,
+    required this.createTime,
+    required this.lastUpdateTime,
+    required this.deleteTime,
+    required this.formattedText,
+    required this.threadIdentifier,
+    required this.threadKey,
+    required this.spaceIdentifier,
+    required this.fallbackText,
+    required this.attachment,
+    required this.threadReply,
+    required this.clientAssignedMessageId,
+    required this.emojis,
+    required this.privateMessageViewerIdentifier,
+    required this.privateMessageViewerIsBot,
+    required this.deletionType,
+    required this.quotedMessageIdentifier,
+    required this.quotedMessageLastUpdateTime,
+    required this.attachedGifs,
+  });
 }
 
 class Attachment {
@@ -162,5 +205,3 @@ enum SpaceThreadingState {
   groupedMessages,
   unthreadedMessages,
 }
-
-enum AccessState { private, discoverable }

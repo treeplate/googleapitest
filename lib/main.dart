@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/web_only.dart';
-import 'package:googleapis/chat/v1.dart' hide TextButton, Card;
+import 'package:googleapis/chat/v1.dart' as chat;
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
+import 'datastructure.dart';
+import 'retriever.dart';
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
@@ -15,16 +17,16 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   GoogleSignInAccount? _currentUser;
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  HangoutsChatApi? api;
+  chat.HangoutsChatApi? api;
   static const List<String> scopes = [
-    HangoutsChatApi.chatSpacesCreateScope,
-    HangoutsChatApi.chatSpacesReadonlyScope,
-    HangoutsChatApi.chatMessagesCreateScope,
-    HangoutsChatApi.chatMessagesReadonlyScope,
+    chat.HangoutsChatApi.chatSpacesCreateScope,
+    chat.HangoutsChatApi.chatSpacesReadonlyScope,
+    chat.HangoutsChatApi.chatMessagesCreateScope,
+    chat.HangoutsChatApi.chatMessagesReadonlyScope,
+    chat.HangoutsChatApi.chatMembershipsReadonlyScope,
   ];
   List<Space>? spaces;
   Space? selectedSpace;
-  List<Message>? messages;
   TextEditingController textEditingController = TextEditingController();
 
   @override
@@ -46,18 +48,13 @@ class _MainAppState extends State<MainApp> {
             api = null;
             spaces = null;
             selectedSpace = null;
-            messages = null;
             _currentUser!.authorizationClient.authorizeScopes(scopes).then((
               GoogleSignInClientAuthorization? auth,
             ) {
               setState(() {
-                api = HangoutsChatApi(auth!.authClient(scopes: scopes));
+                api = chat.HangoutsChatApi(auth!.authClient(scopes: scopes));
               });
-              api!.spaces.list().then((spaces) {
-                setState(() {
-                  this.spaces = spaces.spaces;
-                });
-              });
+              refresh();
             });
           });
           // Attempt to authenticate a previously signed in user.
@@ -66,18 +63,11 @@ class _MainAppState extends State<MainApp> {
   }
 
   void refresh() {
-    api!.spaces.list().then((spaces) {
+    getSpaces(api!).then((spaces) {
       setState(() {
-        this.spaces = spaces.spaces;
+        this.spaces = spaces;
       });
     });
-    if (selectedSpace != null) {
-      api!.spaces.messages.list(selectedSpace!.name!).then((e) {
-        setState(() {
-          messages = e.messages;
-        });
-      });
-    }
   }
 
   @override
@@ -101,15 +91,6 @@ class _MainAppState extends State<MainApp> {
                         onPressed: () {
                           setState(() {
                             selectedSpace = e;
-                            messages = null;
-                          });
-                          api!.spaces.messages.list(selectedSpace!.name!).then((
-                            e,
-                          ) {
-                            setState(() {
-                              messages = e.messages;
-                              messages ??= [];
-                            });
                           });
                         },
                       ),
@@ -123,7 +104,8 @@ class _MainAppState extends State<MainApp> {
               : api == null
               ? LoadingScreen('Authenticating...')
               : spaces == null
-              ? LoadingScreen('Loading spaces...')
+              ? TextButton(onPressed: () { refresh(); },
+              child: LoadingScreen('Loading spaces...'))
               : selectedSpace == null
               ? Text('No selected space. Open the hamburger menu.')
               : Column(
@@ -133,23 +115,20 @@ class _MainAppState extends State<MainApp> {
                       '${selectedSpace!.displayName}',
                       style: TextStyle(fontSize: 50),
                     ),
-                    messages == null
-                        ? LoadingScreen('loading messages')
-                        : Expanded(
+                    Expanded(
                             child: SingleChildScrollView(
                               child: Column(
                                 children: [
-                                  ...messages!.map(
+                                  ...selectedSpace!.messages.map(
                                     (e) => Card(
                                       child: Padding(
                                         padding: const EdgeInsets.all(8.0),
                                         child: Wrap(
                                           children: [
                                             SelectableText(
-                                              e.sender!.displayName ??
-                                                  e.sender!.name!,
+                                              e.senderIdentifier,
                                             ),
-                                            SelectableText(e.text!),
+                                            SelectableText(e.formattedText),
                                           ],
                                         ),
                                       ),
@@ -179,8 +158,8 @@ class _MainAppState extends State<MainApp> {
                             onPressed: () {
                               api!.spaces.messages
                                   .create(
-                                    Message(text: textEditingController.text),
-                                    selectedSpace!.name!,
+                                    chat.Message(text: textEditingController.text),
+                                    selectedSpace!.identifier,
                                   )
                                   .then((_) => refresh());
                             },
