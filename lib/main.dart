@@ -6,6 +6,7 @@ import 'package:googleapis/chat/v1.dart' as chat;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'datastructure.dart';
 import 'retriever.dart';
+import 'package:web/web.dart' hide Text;
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
@@ -28,38 +29,33 @@ class _MainAppState extends State<MainApp> {
   List<Space>? spaces;
   Space? selectedSpace;
   TextEditingController textEditingController = TextEditingController();
+  bool loggedIn = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _googleSignIn
-        .initialize(
-          clientId:
-              "692759468698-k265dgnn15r8buae2lb615amhps0mock.apps.googleusercontent.com",
-        )
-        .then((_) {
-          _googleSignIn.authenticationEvents.listen((event) {
-            setState(() {
-              _currentUser = switch (event) {
-                GoogleSignInAuthenticationEventSignIn() => event.user,
-                _ => null,
-              };
-            });
-            api = null;
-            spaces = null;
-            selectedSpace = null;
-            _currentUser!.authorizationClient.authorizeScopes(scopes).then((
-              GoogleSignInClientAuthorization? auth,
-            ) {
-              setState(() {
-                api = chat.HangoutsChatApi(auth!.authClient(scopes: scopes));
-              });
-              refresh();
-            });
-          });
-          // Attempt to authenticate a previously signed in user.
-          _googleSignIn.attemptLightweightAuthentication();
+  void login(String clientID) {
+    loggedIn = true;
+    _googleSignIn.initialize(clientId: clientID).then((_) {
+      _googleSignIn.authenticationEvents.listen((event) {
+        setState(() {
+          _currentUser = switch (event) {
+            GoogleSignInAuthenticationEventSignIn() => event.user,
+            _ => null,
+          };
         });
+        api = null;
+        spaces = null;
+        selectedSpace = null;
+        _currentUser!.authorizationClient.authorizeScopes(scopes).then((
+          GoogleSignInClientAuthorization? auth,
+        ) {
+          setState(() {
+            api = chat.HangoutsChatApi(auth!.authClient(scopes: scopes));
+          });
+          refresh();
+        });
+      });
+      // Attempt to authenticate a previously signed in user.
+      _googleSignIn.attemptLightweightAuthentication();
+    });
   }
 
   void refresh() {
@@ -75,14 +71,10 @@ class _MainAppState extends State<MainApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(),
-        drawer: Drawer(
-          child: _currentUser == null
-              ? renderButton()
-              : api == null
-              ? LoadingScreen('Authenticating...')
-              : spaces == null
-              ? LoadingScreen('Loading spaces...')
-              : Column(
+        drawer: spaces == null
+            ? null
+            : Drawer(
+                child: Column(
                   children: [
                     OutlinedButton(onPressed: refresh, child: Text('Refresh')),
                     ...spaces!.map(
@@ -97,15 +89,26 @@ class _MainAppState extends State<MainApp> {
                     ),
                   ],
                 ),
-        ),
+              ),
         body: Center(
-          child: _currentUser == null
+          child: !loggedIn
+              ? TextField(
+                  onSubmitted: (text) => setState(() {
+                    window.document.getElementById('placeholderclientid')!.setAttribute('content', text);
+                    login(text);
+                  }),
+                )
+              : _currentUser == null
               ? renderButton()
               : api == null
               ? LoadingScreen('Authenticating...')
               : spaces == null
-              ? TextButton(onPressed: () { refresh(); },
-              child: LoadingScreen('Loading spaces...'))
+              ? TextButton(
+                  onPressed: () {
+                    refresh();
+                  },
+                  child: LoadingScreen('Loading spaces...'),
+                )
               : selectedSpace == null
               ? Text('No selected space. Open the hamburger menu.')
               : Column(
@@ -116,28 +119,26 @@ class _MainAppState extends State<MainApp> {
                       style: TextStyle(fontSize: 50),
                     ),
                     Expanded(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  ...selectedSpace!.messages.map(
-                                    (e) => Card(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Wrap(
-                                          children: [
-                                            SelectableText(
-                                              e.senderIdentifier,
-                                            ),
-                                            SelectableText(e.formattedText),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            ...selectedSpace!.messages.map(
+                              (e) => Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Wrap(
+                                    children: [
+                                      SelectableText(e.senderIdentifier),
+                                      SelectableText(e.formattedText),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
+                        ),
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -158,7 +159,9 @@ class _MainAppState extends State<MainApp> {
                             onPressed: () {
                               api!.spaces.messages
                                   .create(
-                                    chat.Message(text: textEditingController.text),
+                                    chat.Message(
+                                      text: textEditingController.text,
+                                    ),
                                     selectedSpace!.identifier,
                                   )
                                   .then((_) => refresh());
