@@ -1,12 +1,26 @@
 import 'package:googleapis/chat/v1.dart' as chat;
+import 'package:googleapis/people/v1.dart' as chat hide Membership;
 
 import 'datastructure.dart';
 
-Future<List<Space>> getSpaces(chat.HangoutsChatApi api) async {
+Future<List<Space>> getSpaces(
+  chat.HangoutsChatApi chatApi,
+  chat.PeopleServiceApi peopleApi,
+) async {
   List<Space> spaces = [];
-  for (chat.Space space in (await api.spaces.list()).spaces!) {
-    List<chat.Membership> members = (await api.spaces.members.list(space.name!)).memberships!;
-    List<chat.Message> messages = (await api.spaces.messages.list(space.name!)).messages ?? [];
+  for (chat.Space space in (await chatApi.spaces.list()).spaces!) {
+    List<chat.Membership> members = (await chatApi.spaces.members.list(
+      space.name!,
+    )).memberships!;
+    List<chat.Message> messages =
+        (await chatApi.spaces.messages.list(space.name!)).messages ?? [];
+    Map<String, String> people = {};
+    for (chat.Membership member in members) {
+      people[member.member!.name!] = (await peopleApi.people.get(
+        member.member!.name!.replaceAll('users', 'people'),
+        personFields: 'names',
+      )).names?.first.displayName ?? 'Bot';
+    }
     spaces.add(
       Space(
         identifier: space.name!,
@@ -74,96 +88,90 @@ Future<List<Space>> getSpaces(chat.HangoutsChatApi api) async {
             userIdentifier: member.member!.name!,
             isBot: parseUserType(member.member),
             isGroup: member.groupMember != null,
+            name: people[member.name!] ?? 'non-member?',
           );
         }).toList(),
-        messages: messages
-            .map(
-              (message) {
-                return Message(
-                identifier: message.name!,
-                senderIdentifier: message.sender!.name!,
-                senderIsBot: parseUserType(message.sender!),
-                createTime: DateTime.parse(message.createTime!),
-                lastUpdateTime: DateTime.tryParse(message.createTime ?? 'null'),
-                deleteTime: DateTime.tryParse(message.deleteTime ?? 'null'),
-                formattedText: message.formattedText!,
-                threadIdentifier: message.thread!.name!,
-                threadKey: message.thread!.threadKey,
-                spaceIdentifier: message.space!.name!,
-                fallbackText: message.fallbackText,
-                attachment: message.attachment == null
-                    ? null
-                    : Attachment(
-                        identifier: message.attachment!.single.name!,
-                        originalFilename:
-                            message.attachment!.single.contentName!,
-                        contentType: message.attachment!.single.contentType!,
-                        thumbnailURI: message.attachment!.single.thumbnailUri!,
-                        downloadURI: message.attachment!.single.downloadUri!,
-                        fromDrive: switch (message.attachment!.single.source) {
-                          'DRIVE_FILE' => true,
-                          'UPLOADED_CONTENT' => false,
-                          _ => throw FormatException(
-                            'invalid attachment.source ${message.attachment!.single.source}',
-                          ),
-                        },
-                        driveFileID: message
-                            .attachment!
-                            .single
-                            .driveDataRef
-                            ?.driveFileId,
-                        resourceIdentifier: message
-                            .attachment!
-                            .single
-                            .attachmentDataRef
-                            ?.resourceName,
-                        uploadToken: message
-                            .attachment!
-                            .single
-                            .attachmentDataRef
-                            ?.attachmentUploadToken,
+        messages: messages.map((message) {
+          return Message(
+            identifier: message.name!,
+            senderIdentifier: message.sender!.name!,
+            senderIsBot: parseUserType(message.sender!),
+            senderName: people[message.sender!.name!]!,
+            createTime: DateTime.parse(message.createTime!),
+            lastUpdateTime: DateTime.tryParse(message.createTime ?? 'null'),
+            deleteTime: DateTime.tryParse(message.deleteTime ?? 'null'),
+            formattedText: message.formattedText!,
+            threadIdentifier: message.thread!.name!,
+            threadKey: message.thread!.threadKey,
+            spaceIdentifier: message.space!.name!,
+            fallbackText: message.fallbackText,
+            attachment: message.attachment == null
+                ? null
+                : Attachment(
+                    identifier: message.attachment!.single.name!,
+                    originalFilename: message.attachment!.single.contentName!,
+                    contentType: message.attachment!.single.contentType!,
+                    thumbnailURI: message.attachment!.single.thumbnailUri!,
+                    downloadURI: message.attachment!.single.downloadUri!,
+                    fromDrive: switch (message.attachment!.single.source) {
+                      'DRIVE_FILE' => true,
+                      'UPLOADED_CONTENT' => false,
+                      _ => throw FormatException(
+                        'invalid attachment.source ${message.attachment!.single.source}',
                       ),
-                threadReply: message.threadReply ?? false,
-                clientAssignedMessageId: message.clientAssignedMessageId,
-                emojis: Map.fromEntries(
-                  message.emojiReactionSummaries?.map(
-                        (e) => MapEntry(
-                          e.emoji!.unicode ??
-                              e.emoji!.customEmoji?.uid ??
-                              'unknown emoji',
-                          e.reactionCount!,
-                        ),
-                      ) ??
-                      [],
-                ),
-                privateMessageViewerIdentifier:
-                    message.privateMessageViewer?.name,
-                privateMessageViewerIsBot: parseUserType(
-                  message.privateMessageViewer,
-                ),
-                deletionType: switch (message.deletionMetadata?.deletionType) {
-                  null => null,
-                  'CREATOR' => .creator,
-                  'SPACE_OWNER' => .spaceOwner,
-                  'ADMIN' => .admin,
-                  'APP_MESSAGE_EXPIRY' => .appMessageExpiry,
-                  'CREATOR_VIA_APP' => .creatorViaApp,
-                  'SPACE_OWNER_VIA_APP' => .spaceOwnerViaApp,
-                  'SPACE_MEMBER' => .spaceMember,
-                  _ => throw FormatException(
-                    'invalid deletionType ${message.deletionMetadata?.deletionType}',
+                    },
+                    driveFileID:
+                        message.attachment!.single.driveDataRef?.driveFileId,
+                    resourceIdentifier: message
+                        .attachment!
+                        .single
+                        .attachmentDataRef
+                        ?.resourceName,
+                    uploadToken: message
+                        .attachment!
+                        .single
+                        .attachmentDataRef
+                        ?.attachmentUploadToken,
                   ),
-                },
-                quotedMessageIdentifier: message.quotedMessageMetadata?.name,
-                quotedMessageLastUpdateTime: DateTime.tryParse(
-                  message.quotedMessageMetadata?.lastUpdateTime ?? 'null',
-                ),
-                attachedGifs:
-                    message.attachedGifs?.map((e) => e.uri!).toList() ?? [],
-              );
-              },
-            )
-            .toList(),
+            threadReply: message.threadReply ?? false,
+            clientAssignedMessageId: message.clientAssignedMessageId,
+            emojis: Map.fromEntries(
+              message.emojiReactionSummaries?.map(
+                    (e) => MapEntry(
+                      e.emoji!.unicode ??
+                          e.emoji!.customEmoji?.uid ??
+                          'unknown emoji',
+                      e.reactionCount!,
+                    ),
+                  ) ??
+                  [],
+            ),
+            privateMessageViewerIdentifier: message.privateMessageViewer?.name,
+            privateMessageViewerIsBot: parseUserType(
+              message.privateMessageViewer,
+            ),
+            privateMessageViewerName: people[message.privateMessageViewer?.name],
+            deletionType: switch (message.deletionMetadata?.deletionType) {
+              null => null,
+              'CREATOR' => .creator,
+              'SPACE_OWNER' => .spaceOwner,
+              'ADMIN' => .admin,
+              'APP_MESSAGE_EXPIRY' => .appMessageExpiry,
+              'CREATOR_VIA_APP' => .creatorViaApp,
+              'SPACE_OWNER_VIA_APP' => .spaceOwnerViaApp,
+              'SPACE_MEMBER' => .spaceMember,
+              _ => throw FormatException(
+                'invalid deletionType ${message.deletionMetadata?.deletionType}',
+              ),
+            },
+            quotedMessageIdentifier: message.quotedMessageMetadata?.name,
+            quotedMessageLastUpdateTime: DateTime.tryParse(
+              message.quotedMessageMetadata?.lastUpdateTime ?? 'null',
+            ),
+            attachedGifs:
+                message.attachedGifs?.map((e) => e.uri!).toList() ?? [],
+          );
+        }).toList(),
       ),
     );
   }

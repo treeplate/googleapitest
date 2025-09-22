@@ -76,6 +76,8 @@ class SpaceMember {
   final bool isBot;
   // what type "member" is
   final bool isGroup;
+  // via People API - TODO: might not work for isGroup
+  final String name;
 
   SpaceMember({
     required this.memberIdentifier,
@@ -84,6 +86,7 @@ class SpaceMember {
     required this.userIdentifier,
     required this.isBot,
     required this.isGroup,
+    required this.name,
   });
 }
 
@@ -93,6 +96,8 @@ class Message {
   final String senderIdentifier;
   // "sender.type"
   final bool senderIsBot;
+  // via People API
+  final String senderName;
   final DateTime createTime;
   // null if never edited
   final DateTime? lastUpdateTime;
@@ -118,6 +123,8 @@ class Message {
   final String? privateMessageViewerIdentifier;
   // "privateMessageViewer.type" - null if not private message
   final bool? privateMessageViewerIsBot;
+  // via People API
+  final String? privateMessageViewerName;
   // "deletionMetadata.deletionType" - null if not deleted
   final DeletionType? deletionType;
   // "quotedMessageMetadata.name" - null if no quoted message
@@ -130,6 +137,7 @@ class Message {
     required this.identifier,
     required this.senderIdentifier,
     required this.senderIsBot,
+    required this.senderName,
     required this.createTime,
     required this.lastUpdateTime,
     required this.deleteTime,
@@ -144,6 +152,7 @@ class Message {
     required this.emojis,
     required this.privateMessageViewerIdentifier,
     required this.privateMessageViewerIsBot,
+    required this.privateMessageViewerName,
     required this.deletionType,
     required this.quotedMessageIdentifier,
     required this.quotedMessageLastUpdateTime,

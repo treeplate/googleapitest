@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/web_only.dart';
 import 'package:googleapis/chat/v1.dart' as chat;
+import 'package:googleapis/people/v1.dart' as chat;
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'datastructure.dart';
@@ -18,13 +19,16 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   GoogleSignInAccount? _currentUser;
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  chat.HangoutsChatApi? api;
+  chat.HangoutsChatApi? chatApi;
+  chat.PeopleServiceApi? peopleApi;
   static const List<String> scopes = [
     chat.HangoutsChatApi.chatSpacesCreateScope,
     chat.HangoutsChatApi.chatSpacesReadonlyScope,
     chat.HangoutsChatApi.chatMessagesCreateScope,
     chat.HangoutsChatApi.chatMessagesReadonlyScope,
     chat.HangoutsChatApi.chatMembershipsReadonlyScope,
+    chat.PeopleServiceApi.contactsOtherReadonlyScope,
+    chat.PeopleServiceApi.contactsReadonlyScope,
   ];
   List<Space>? spaces;
   Space? selectedSpace;
@@ -41,14 +45,16 @@ class _MainAppState extends State<MainApp> {
             _ => null,
           };
         });
-        api = null;
+        chatApi = null;
+        peopleApi = null;
         spaces = null;
         selectedSpace = null;
         _currentUser!.authorizationClient.authorizeScopes(scopes).then((
           GoogleSignInClientAuthorization? auth,
         ) {
           setState(() {
-            api = chat.HangoutsChatApi(auth!.authClient(scopes: scopes));
+            chatApi = chat.HangoutsChatApi(auth!.authClient(scopes: scopes));
+            peopleApi = chat.PeopleServiceApi(auth.authClient(scopes: scopes));
           });
           refresh();
         });
@@ -59,15 +65,20 @@ class _MainAppState extends State<MainApp> {
   }
 
   void refresh() {
-    getSpaces(api!).then((spaces) {
+    getSpaces(chatApi!, peopleApi!).then((spaces) {
       setState(() {
         this.spaces = spaces;
+        if (selectedSpace != null) {
+          // TODO; what if it got deleted
+          selectedSpace = spaces.singleWhere((e) => e.identifier == selectedSpace!.identifier);
+        } 
       });
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    print('moo');
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(),
@@ -100,7 +111,7 @@ class _MainAppState extends State<MainApp> {
                 )
               : _currentUser == null
               ? renderButton()
-              : api == null
+              : chatApi == null
               ? LoadingScreen('Authenticating...')
               : spaces == null
               ? TextButton(
@@ -123,17 +134,24 @@ class _MainAppState extends State<MainApp> {
                         child: Column(
                           children: [
                             ...selectedSpace!.messages.map(
-                              (e) => Card(
+                              (e) {
+                                print('moo2');
+                                return Card(
                                 child: Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: Wrap(
                                     children: [
-                                      SelectableText(e.senderIdentifier),
+                                      SelectableText(e.senderName),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                        child: Container(width: 1, height: 20, color: Colors.black,),
+                                      ),
                                       SelectableText(e.formattedText),
                                     ],
                                   ),
                                 ),
-                              ),
+                              );
+                              },
                             ),
                           ],
                         ),
@@ -157,7 +175,7 @@ class _MainAppState extends State<MainApp> {
                           ),
                           IconButton(
                             onPressed: () {
-                              api!.spaces.messages
+                              chatApi!.spaces.messages
                                   .create(
                                     chat.Message(
                                       text: textEditingController.text,
